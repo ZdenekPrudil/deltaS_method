@@ -1,5 +1,6 @@
 from deltaS_multi import *
 import pytest
+#from unittest import assertTupleEqual
 
 ca_boundary = np.array([3910.00, 3925.00, 3940.00, 3955.00, 3923.67, 3943.67])
 
@@ -24,7 +25,7 @@ wave = np.array([
        3954.57684794, 3955.48659314, 3956.39871962, 3957.30888394,
        3958.22143063, 3959.13201427])
 
-flux = np.array([ 
+flux = np.array([
         839.82012939,  869.74200439,  898.57171631,  926.06152344,
         942.06347656,  931.1348877 ,  935.86627197,  949.25994873,
         960.63293457, 1013.12988281, 1013.94696045, 1007.37365723,
@@ -129,18 +130,57 @@ eflux_cont_flip = np.array([
 
 class Test_center_line:
     def test_normal_case(self):
-        assert isinstance(center_line(wave_line, flux_line, eflux_line), float), "correct type"
+        assert isinstance(center_line(wave_line, flux_line, eflux_line), float)#, "correct type"
 
-
-    def test_negative_case_turned_positive(self): 
+    def test_negative_case_turned_positive(self):
         empty_array = np.array([])
         NoneType = type(None)
         assert isinstance(center_line(empty_array, flux_line, eflux_line), NoneType)
 
+
+class Test_calculate_rr_ew:
+    def test_normal_case(self):
+        assert isinstance(calculate_rr_ew(wave, flux_cont_flip, eflux_cont_flip, ca_boundary), float)#, "correct type"
+
+    def test_negative_case_turned_positive(self):
+        empty_array = np.array([])
+        NoneType = type(None)
+        assert isinstance(calculate_rr_ew(wave, empty_array, empty_array, ca_boundary), NoneType)
+
+
+class Test_calculate_snr:
+    def test_normal_case(self):
+        assert isinstance(calculate_snr(wave, flux_cont_flip, ca_boundary), float)#, "correct type"
+
+    def test_negative_case_turned_positive(self):
+        empty_array = np.array([])
+        NoneType = type(None)
+        assert isinstance(calculate_snr(wave, empty_array, ca_boundary), NoneType)
+
+
+class Test_normalize_flux:
+    def test_normal_case(self):
+        expected_output = (flux_cont_flip, eflux_cont_flip)
+        output = normalize_flux(wave, flux, eflux, ca_boundary)
+        assert np.allclose(output[0], expected_output[0]) & np.allclose(output[1], expected_output[1])
+
+    def test_negative(self):
+        expected_output = (np.ones(len(wave)), np.ones(len(wave)))
+        output = normalize_flux(wave, flux, eflux, ca_boundary)
+        assert ~np.allclose(output[0], expected_output[0]) | ~np.allclose(output[1], expected_output[1])
+
+    def test_negative_case_turned_positive(self):
+        expected_output = (np.array([]), np.array([]))
+        output = normalize_flux(wave, np.array([]), eflux, ca_boundary)
+        assert np.allclose(output[0], expected_output[0]) & np.allclose(output[1], expected_output[1])
+
+
+
+
 """
 # For specific runs
 
-def test_negative_case_turned_positive(): 
+def test_negative_case_turned_positive():
     empty_array = np.array([])
     NoneType = type(None)
     assert isinstance(center_line(empty_array, flux_line, eflux_line), NoneType)
