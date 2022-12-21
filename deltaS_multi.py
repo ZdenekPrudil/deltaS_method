@@ -6,6 +6,13 @@ from joblib import Parallel, delayed, parallel_backend, cpu_count
 
 # Coefficients for metallicity calculation, line 1 in table 8 Crestani+2021
 C0, C1, C2, C3, C4 = -3.84323, 0.36828, -0.22182, 0.00433, 0.51481
+C0a, C1a, C2a, C3a = -3.75381, 0.39014, -0.19997, 0.38916
+C0b, C1b, C2b, C4b = -3.84160, 0.36798, -0.21936, 0.51676
+C0c, C1c, C3c, C4c = -3.79074, 0.35889, -0.21997, 0.50469
+C0d, C1d, C2d = -3.48130, 0.36105, 0.14403
+C0e, C1e, C3e = -3.70799, 0.38127, 0.17973
+C0f, C1f, C4f = -3.92067, 0.38194, 0.25898
+
 
 # Crestani+2021 wavelenght (in AA) boundaries for continuum and line
 ca_boundary = np.array([3910.00, 3925.00, 3940.00, 3955.00, 3923.67, 3943.67])
@@ -18,7 +25,7 @@ line_centers = np.array([3933.66, 4101.75, 4340.47, 4861.34])
 
 
 # Starting constants
-NUMBER_OF_ITERATIONS = 10
+NUMBER_OF_ITERATIONS = 100
 NUMBER_OF_THREADS = cpu_count()
 
 
@@ -175,7 +182,13 @@ def calculate_rr_ew(wave, flux_flip, conti_err, slicing):
     pseudo_ew : 'float'
         Pseudo-equivalent width
     """
-    if (flux_flip.size == wave.size == conti_err.size) & (flux_flip.size > 0 ):
+
+    mask_line = np.where( (wave > slicing[4]) & (wave < slicing[5]) )[0]
+
+    if ( (flux_flip.size == wave.size == conti_err.size)
+            & (flux_flip.size > 0)
+            & (mask_line.size > 3) ):
+
         f = InterpolatedUnivariateSpline(wave, flux_flip, w=conti_err**-2, k=1)
         pseudo_ew = f.integral(slicing[4], slicing[5])
 
@@ -220,19 +233,22 @@ def multi_proc_function(wave, flux_r, eflux, boundary, select_region, wave_shift
 
     for k, (boun, reg, shift) in enumerate(zip(boundary, select_region, wave_shift)):
 
-        wavelenght_shifted = wave[reg] + shift
+        if shift:
+            wavelenght_shifted = wave[reg] + shift
 
-        flux_norm, eflux_norm = normalize_flux(wavelenght_shifted,
-                                               flux_r[reg],
-                                               eflux[reg],
-                                               boun)
+            flux_norm, eflux_norm = normalize_flux(wavelenght_shifted,
+                                                   flux_r[reg],
+                                                   eflux[reg],
+                                                   boun)
 
-        snr[k] = calculate_snr(wavelenght_shifted, flux_norm, boun)
+            snr[k] = calculate_snr(wavelenght_shifted, flux_norm, boun)
 
-        equivalent_width[k] = calculate_rr_ew(wavelenght_shifted,
-                                              flux_norm,
-                                              eflux_norm,
-                                              boun)
+            equivalent_width[k] = calculate_rr_ew(wavelenght_shifted,
+                                                  flux_norm,
+                                                  eflux_norm,
+                                                  boun)
+        else:
+            snr[k], equivalent_width[k] = np.nan, np.nan
 
     if np.isnan(equivalent_width).all() or np.isnan(snr).all():
         return ma.ones((2, number_of_lines))*-999.
@@ -286,9 +302,96 @@ def est_individual_lines(wave, flux, eflux, boundary, select_region, wave_shift)
 
     return ew_for_all_lines, snr_for_all_lines
 
-
 # ----------------------------------------------------------------------------
 
+def calculation_of_metallicity(ew_ls):
+    """
+    Calculating metallicity based on relations from Crestani+2021.
+
+    Parameters
+    ----------
+    ew_ls : 'array_like, shape (NUMBER_OF_ITERATIONS, 4)'
+        Pseudo-equivalent widths of all lines.
+
+    Returns:
+    -------
+    feh : 'float'
+        Average metallicity based on
+        relations Crestani+2021.
+    efeh : 'float'
+        Standard deviation of metallicity
+        based on relations Crestani+2021.
+    """
+
+    if ew_ls.ndim < 2:
+        return (-999., -999.)
+
+
+
+    if ( (np.nansum(ew_ls[:,0]) > 0.) and
+           (np.nansum(ew_ls[:,1]) > 0.) and
+           (np.nansum(ew_ls[:,2]) > 0.) and
+           (np.nansum(ew_ls[:,3]) > 0.) ):
+
+           feh = C0 + C1*ew_ls[:,0] + C2*ew_ls[:,1] + C3*ew_ls[:,2] + C4*ew_ls[:,3]
+
+
+    elif ( (np.nansum(ew_ls[:,0]) > 0.) and
+           (np.nansum(ew_ls[:,1]) > 0.) and
+           (np.nansum(ew_ls[:,2]) > 0.) and
+           (np.nansum(ew_ls[:,3]) == 0.) ):
+           #print("--- No beta line ---")
+           feh = C0a + C1a*ew_ls[:,0] + C2a*ew_ls[:,1] + C3a*ew_ls[:,2]
+
+
+    elif ( (np.nansum(ew_ls[:,0]) > 0.) and
+           (np.nansum(ew_ls[:,1]) > 0.) and
+           (np.nansum(ew_ls[:,2]) == 0.) and
+           (np.nansum(ew_ls[:,3]) > 0.) ):
+
+           feh = C0b + C1b*ew_ls[:,0] + C2b*ew_ls[:,1] + C4b*ew_ls[:,3]
+
+
+    elif ( (np.nansum(ew_ls[:,0]) > 0.) and
+           (np.nansum(ew_ls[:,1]) == 0.) and
+           (np.nansum(ew_ls[:,2]) > 0.) and
+           (np.nansum(ew_ls[:,3]) > 0.) ):
+
+           feh = C0c + C1c*ew_ls[:,0] + C3c*ew_ls[:,2] + C4c*ew_ls[:,3]
+
+
+    elif ( (np.nansum(ew_ls[:,0]) > 0.) and
+           (np.nansum(ew_ls[:,1]) > 0.) and
+           (np.nansum(ew_ls[:,2]) == 0.) and
+           (np.nansum(ew_ls[:,3]) == 0.) ):
+
+           feh = C0d + C1d*ew_ls[:,0] + C2d*ew_ls[:,1]
+
+
+    elif ( (np.nansum(ew_ls[:,0]) > 0.) and
+           (np.nansum(ew_ls[:,1]) == 0.) and
+           (np.nansum(ew_ls[:,2]) > 0.) and
+           (np.nansum(ew_ls[:,3]) == 0.) ):
+
+           feh = C0e + C1e*ew_ls[:,0] + C3e*ew_ls[:,2]
+
+
+    elif ( (np.nansum(ew_ls[:,0]) > 0.) and
+           (np.nansum(ew_ls[:,1]) == 0.) and
+           (np.nansum(ew_ls[:,2]) == 0.) and
+           (np.nansum(ew_ls[:,3]) > 0.) ):
+
+           feh = C0f + C1f*ew_ls[:,0] + C4f*ew_ls[:,3]
+
+
+    else:
+        return (-999., -999.)
+
+
+    return (np.nanmean(feh), np.nanstd(feh))
+
+
+# ----------------------------------------------------------------------------
 
 
 def main():
@@ -296,6 +399,8 @@ def main():
 
     data = np.genfromtxt("/Users/zprudil/Dropbox/___CATS/---+++/deltaS/2880057803597178880-gudy.txt")
     #data = np.genfromtxt("/Users/zprudil/Dropbox/___CATS/---+++/deltaS/2880057803597178880-bady.txt")
+    #data = np.genfromtxt("/Users/zprudil/Dropbox/___CATS/---+++/deltaS/2880057803597178880-bady2.txt")
+    #data = np.genfromtxt("/Users/zprudil/Dropbox/___CATS/---+++/deltaS/2880057803597178880-bady3.txt")
 
 
     remove_bad_values = np.where( (~np.isnan(data[:,0]) & np.isfinite(data[:,0])) &
@@ -358,15 +463,15 @@ def main():
                                 else signal_to_noise[:,i]
                                 for i in range(len(shifts)) ]).T
 
-    feh = C0 + C1*ew_ls[:,0] + C2*ew_ls[:,1] + C3*ew_ls[:,2] + C4*ew_ls[:,3]
+
+    feh_val, efeh_val = calculation_of_metallicity(ew_ls)
 
     print ("%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f " %(
-        np.nanmean(feh), np.nanstd(feh),
+        feh_val, efeh_val,
         np.nanmean(ew_ls[:,0]), np.nanstd(ew_ls[:,0]),
         np.nanmean(ew_ls[:,1]), np.nanstd(ew_ls[:,1]),
         np.nanmean(ew_ls[:,2]), np.nanstd(ew_ls[:,2]),
         np.nanmean(ew_ls[:,3]), np.nanstd(ew_ls[:,3])))
-
 
     return None
 
@@ -374,3 +479,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+    """
+    print ("%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f " %(
+        np.nanmean(feh), np.nanstd(feh),
+        np.nanmean(ew_ls[:,0]), np.nanstd(ew_ls[:,0]),
+        np.nanmean(ew_ls[:,1]), np.nanstd(ew_ls[:,1]),
+        np.nanmean(ew_ls[:,2]), np.nanstd(ew_ls[:,2]),
+        np.nanmean(ew_ls[:,3]), np.nanstd(ew_ls[:,3])))
+    """

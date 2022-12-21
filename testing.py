@@ -128,6 +128,20 @@ eflux_cont_flip = np.array([
 
 # ------------------------------------------------------------------------------
 
+test_ew_ls = np.array([ [1,1,1,1,1,1],
+                        [2,2,2,2,2,2],
+                        [3,3,3,3,3,3],
+                        [4,4,4,4,4,4] ]).T
+
+test_ew_ls_bad = np.array([ [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                            [2,2,2,2,2,2],
+                            [3,3,3,3,3,3],
+                            [4,4,4,4,4,4] ]).T
+
+
+# ------------------------------------------------------------------------------
+
+
 class Test_center_line:
     def test_normal_case(self):
         assert isinstance(center_line(wave_line, flux_line, eflux_line), float)#, "correct type"
@@ -175,7 +189,28 @@ class Test_normalize_flux:
         assert np.allclose(output[0], expected_output[0]) & np.allclose(output[1], expected_output[1])
 
 
+class Test_calculation_of_metallicity:
+    def test_normal_case(self):
+        assert isinstance(calculation_of_metallicity(test_ew_ls)[0], float)#, "correct type"
 
+    def test_normal_case2(self):
+        assert isinstance(calculation_of_metallicity(test_ew_ls)[1], float)#, "correct type"
+
+    def test_negative_case_turned_positive(self):
+        assert isinstance(calculation_of_metallicity(test_ew_ls_bad)[0], float)
+
+    def test_negative_case_turned_positive2(self):
+        assert isinstance(calculation_of_metallicity(test_ew_ls_bad)[0], float)
+
+    """
+    def test_normal_case(self):
+        assert isinstance(calculation_of_metallicity(test_ew_ls)[1], float)#, "correct type"
+
+    def test_negative_case_turned_positive(self):
+        empty_array = np.array([])
+        NoneType = type(None)
+        assert isinstance(calculation_of_metallicity(test_ew_ls)[1], NoneType)
+    """
 
 """
 # For specific runs
