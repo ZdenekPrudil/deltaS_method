@@ -138,6 +138,9 @@ test_ew_ls_bad = np.array([ [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                             [3,3,3,3,3,3],
                             [4,4,4,4,4,4] ]).T
 
+ca_shift = -0.809808
+
+ca_region = np.where((wave > min(ca_boundary)) & (wave < max(ca_boundary)))
 
 # ------------------------------------------------------------------------------
 
@@ -191,10 +194,10 @@ class Test_normalize_flux:
 
 class Test_calculation_of_metallicity:
     def test_normal_case(self):
-        assert isinstance(calculation_of_metallicity(test_ew_ls)[0], float)#, "correct type"
+        assert isinstance(calculation_of_metallicity(test_ew_ls)[0], float)
 
     def test_normal_case2(self):
-        assert isinstance(calculation_of_metallicity(test_ew_ls)[1], float)#, "correct type"
+        assert isinstance(calculation_of_metallicity(test_ew_ls)[1], float)
 
     def test_negative_case_turned_positive(self):
         assert isinstance(calculation_of_metallicity(test_ew_ls_bad)[0], float)
@@ -202,15 +205,54 @@ class Test_calculation_of_metallicity:
     def test_negative_case_turned_positive2(self):
         assert isinstance(calculation_of_metallicity(test_ew_ls_bad)[0], float)
 
-    """
+
+class Test_est_individual_lines:
     def test_normal_case(self):
-        assert isinstance(calculation_of_metallicity(test_ew_ls)[1], float)#, "correct type"
+        test_array = np.empty(NUMBER_OF_ITERATIONS).reshape((NUMBER_OF_ITERATIONS, 1))
+        output_list = est_individual_lines(wave, flux, eflux,
+                                           [ca_boundary], [ca_region], [ca_shift])[0]
+        assert np.shape(output_list) == np.shape(test_array)
+
+    def test_normal_case2(self):
+        test_array = np.empty(NUMBER_OF_ITERATIONS).reshape((NUMBER_OF_ITERATIONS, 1))
+        output_list = est_individual_lines(wave, flux, eflux,
+                                           [ca_boundary], [ca_region], [ca_shift])[1]
+        assert np.shape(output_list) == np.shape(test_array)
 
     def test_negative_case_turned_positive(self):
-        empty_array = np.array([])
-        NoneType = type(None)
-        assert isinstance(calculation_of_metallicity(test_ew_ls)[1], NoneType)
-    """
+        output_list = est_individual_lines(np.array([]), flux, eflux,
+                                           [ca_boundary], [ca_region], [ca_shift])[0]
+        assert np.shape(output_list) != np.shape(np.array([]))
+
+    def test_negative_case_turned_positive2(self):
+        output_list = est_individual_lines(np.array([]), flux, eflux,
+                                           [ca_boundary], [ca_region], [ca_shift])[1]
+        assert np.shape(output_list) != np.shape(np.array([]))
+
+
+
+class Test_multi_proc_function:
+    def test_normal_case(self):
+        assert isinstance(multi_proc_function(wave, flux, eflux,
+                                              [ca_boundary], [ca_region], [ca_shift])[0][0],
+                                              float)
+
+    def test_normal_case2(self):
+        assert isinstance(multi_proc_function(wave, flux, eflux,
+                                              [ca_boundary], [ca_region], [ca_shift])[1][0],
+                                              float)
+
+    def test_negative_case_turned_positive(self):
+        assert isinstance(multi_proc_function(wave, np.array([]), eflux,
+                                              [ca_boundary], [ca_region], [ca_shift])[0][0],
+                                              float)
+
+    def test_negative_case_turned_positive2(self):
+        assert isinstance(multi_proc_function(wave, np.array([]), eflux,
+                                              [ca_boundary], [ca_region], [ca_shift])[1][0],
+                                              float)
+
+
 
 """
 # For specific runs

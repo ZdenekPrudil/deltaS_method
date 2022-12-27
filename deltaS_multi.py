@@ -25,7 +25,7 @@ line_centers = np.array([3933.66, 4101.75, 4340.47, 4861.34])
 
 
 # Starting constants
-NUMBER_OF_ITERATIONS = 100
+NUMBER_OF_ITERATIONS = 1000
 NUMBER_OF_THREADS = cpu_count()
 
 
@@ -52,7 +52,7 @@ def center_line(wave, flux, eflux, deg=4):
         the spectral line.
     """
 
-    if (flux.size == wave.size == eflux.size) & (wave.size > 0 ):
+    if ( (flux.size == wave.size == eflux.size) & (wave.size > 0 ) ):
 
         x_fit = np.linspace(min(wave), max(wave), 1000)
 
@@ -233,7 +233,7 @@ def multi_proc_function(wave, flux_r, eflux, boundary, select_region, wave_shift
 
     for k, (boun, reg, shift) in enumerate(zip(boundary, select_region, wave_shift)):
 
-        if shift:
+        if shift and (flux_r.size == wave.size == eflux.size):
             wavelenght_shifted = wave[reg] + shift
 
             flux_norm, eflux_norm = normalize_flux(wavelenght_shifted,
@@ -284,23 +284,30 @@ def est_individual_lines(wave, flux, eflux, boundary, select_region, wave_shift)
         Signal-noise-ratio for all spectral lines.
     """
 
-    flux_r = np.array([np.random.normal(flux, eflux)
-                      for i in range(NUMBER_OF_ITERATIONS)])
+    if ( (flux.size == wave.size == eflux.size)
+            & (flux.size > 0) ):
+
+        flux_r = np.array([np.random.normal(flux, eflux)
+                          for i in range(NUMBER_OF_ITERATIONS)])
 
 
-    with parallel_backend('multiprocessing'):
-        res = Parallel(n_jobs=NUMBER_OF_THREADS)((delayed(multi_proc_function))
-            (wave, abs(flux_r[i]), eflux, boundary, select_region, wave_shift)
-            for i in range(NUMBER_OF_ITERATIONS))
+        with parallel_backend('multiprocessing'):
+            res = Parallel(n_jobs=NUMBER_OF_THREADS)((delayed(multi_proc_function))
+                (wave, abs(flux_r[i]), eflux, boundary, select_region, wave_shift)
+                for i in range(NUMBER_OF_ITERATIONS))
 
 
-    res = np.array(res)
+        res = np.array(res)
 
-    ew_for_all_lines = res[:,0]
-    snr_for_all_lines = res[:,1]
+        ew_for_all_lines = res[:,0]
+        snr_for_all_lines = res[:,1]
 
 
-    return ew_for_all_lines, snr_for_all_lines
+        return ew_for_all_lines, snr_for_all_lines
+
+    else:
+        return None, None
+
 
 # ----------------------------------------------------------------------------
 
@@ -327,7 +334,6 @@ def calculation_of_metallicity(ew_ls):
         return (-999., -999.)
 
 
-
     if ( (np.nansum(ew_ls[:,0]) > 0.) and
            (np.nansum(ew_ls[:,1]) > 0.) and
            (np.nansum(ew_ls[:,2]) > 0.) and
@@ -340,7 +346,7 @@ def calculation_of_metallicity(ew_ls):
            (np.nansum(ew_ls[:,1]) > 0.) and
            (np.nansum(ew_ls[:,2]) > 0.) and
            (np.nansum(ew_ls[:,3]) == 0.) ):
-           #print("--- No beta line ---")
+
            feh = C0a + C1a*ew_ls[:,0] + C2a*ew_ls[:,1] + C3a*ew_ls[:,2]
 
 
@@ -385,6 +391,7 @@ def calculation_of_metallicity(ew_ls):
 
 
     else:
+
         return (-999., -999.)
 
 
@@ -462,7 +469,6 @@ def main():
                                 if np.all(np.isnan(signal_to_noise[:,i]))
                                 else signal_to_noise[:,i]
                                 for i in range(len(shifts)) ]).T
-
 
     feh_val, efeh_val = calculation_of_metallicity(ew_ls)
 
