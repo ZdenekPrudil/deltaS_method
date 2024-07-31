@@ -49,7 +49,7 @@ def center_line(wave, flux, eflux, deg=4):
     -------
     wave_shift : 'float'
         Wavelenght shift to center
-        the spectral line.
+        of the spectral line.
     """
 
     if ( (flux.size == wave.size == eflux.size) & (wave.size > 0 ) ):
@@ -68,7 +68,7 @@ def center_line(wave, flux, eflux, deg=4):
 
     else:
 
-        return None
+        return 0.0
 
 # ------------------------------------------------------------------------------
 
